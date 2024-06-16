@@ -1,0 +1,3 @@
+[console_scripts]
+mlagent = mlagent.__main__:main
+

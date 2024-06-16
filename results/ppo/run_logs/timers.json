@@ -1,0 +1,42 @@
+{
+    "name": "root",
+    "metadata": {
+        "timer_format_version": "0.1.0",
+        "start_time_seconds": "1718184536",
+        "python_version": "3.9.13 (tags/v3.9.13:6de2ca5, May 17 2022, 16:36:42) [MSC v.1929 64 bit (AMD64)]",
+        "command_line_arguments": "D:\\Repozytorium\\Studia\\Magister\\Magister2D\\venv\\Scripts\\mlagents-learn --resume",
+        "mlagents_version": "0.30.0",
+        "mlagents_envs_version": "0.30.0",
+        "communication_protocol_version": "1.5.0",
+        "pytorch_version": "2.2.2+cpu",
+        "numpy_version": "1.21.2",
+        "end_time_seconds": "1718184599"
+    },
+    "total": 62.25321220000001,
+    "count": 1,
+    "self": 0.0030515000000121972,
+    "children": {
+        "run_training.setup": {
+            "total": 0.060831599999999764,
+            "count": 1,
+            "self": 0.060831599999999764
+        },
+        "TrainerController.start_learning": {
+            "total": 62.189329099999995,
+            "count": 1,
+            "self": 0.00015069999998473804,
+            "children": {
+                "TrainerController._reset_env": {
+                    "total": 62.189161500000004,
+                    "count": 1,
+                    "self": 62.189161500000004
+                },
+                "TrainerController._save_models": {
+                    "total": 1.6900000005648508e-05,
+                    "count": 1,
+                    "self": 1.6900000005648508e-05
+                }
+            }
+        }
+    }
+}
