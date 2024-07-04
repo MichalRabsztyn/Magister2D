@@ -1,24 +1,33 @@
 using System;
+using Unity.MLAgents;
+using Unity.MLAgents.Actuators;
+using Unity.MLAgents.Sensors;
 using UnityEngine;
+using TMPro;
+using Unity.MLAgents.Integrations.Match3;
+using UnityEngine.SceneManagement;
 
 namespace TarodevController
 {
-	/// <summary>
-	/// Hey!
-	/// Tarodev here. I built this controller as there was a severe lack of quality & free 2D controllers out there.
-	/// I have a premium version on Patreon, which has every feature you'd expect from a polished controller. Link: https://www.patreon.com/tarodev
-	/// You can play and compete for best times here: https://tarodev.itch.io/extended-ultimate-2d-controller
-	/// If you hve any questions or would like to brag about your score, come to discord: https://discord.gg/tarodev
-	/// </summary>
-	[RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
-	public class AgentPlayerController : MonoBehaviour, IPlayerController
+	public class PlayerController : MonoBehaviour, IPlayerController
 	{
 		[SerializeField] private ScriptableStats _stats;
+		[SerializeField] private TextMeshProUGUI _timerText;
+
 		private Rigidbody2D _rb;
 		private CapsuleCollider2D _col;
+		private PausePanel _pausePanel;
 		private FrameInput _frameInput;
 		private Vector2 _frameVelocity;
 		private bool _cachedQueryStartInColliders;
+
+		private bool _allowUpdate = true;
+		private bool _playerMoved = false;
+
+		private Vector3 _startPosition;
+
+		private Vector2 _savedVelocity;
+		private float _savedGravityScale;
 
 		#region Interface
 
@@ -29,19 +38,66 @@ namespace TarodevController
 		#endregion
 
 		private float _time;
+		private float _points;
 
 		private void Awake()
 		{
 			_rb = GetComponent<Rigidbody2D>();
 			_col = GetComponent<CapsuleCollider2D>();
+			_pausePanel = GetComponent<PausePanel>();
 
 			_cachedQueryStartInColliders = Physics2D.queriesStartInColliders;
+			_startPosition = transform.localPosition;
+			_timerText?.SetText(0.ToString("D7"));
+		}
+
+		private void Start()
+		{
+			_rb.velocity = Vector2.zero;
+			transform.localPosition = _startPosition;
+			_grounded = true;		
 		}
 
 		private void Update()
 		{
-			_time += Time.deltaTime;
+			if (Input.GetKeyDown(KeyCode.Escape))
+			{
+				_pausePanel?.ShowPanel();
+				return;
+			}
+
 			GatherInput();
+		}
+
+		private void PlayerReset(bool bSuccess)
+		{
+			_rb.velocity = Vector2.zero;
+			transform.localPosition = _startPosition;
+			_grounded = true;
+			_frameVelocity = Vector2.zero;
+			_bufferedJumpUsable = false;
+			_playerMoved = false;
+
+			_timerText.SetText("0");
+			GetComponent<SummaryScreen>()?.ShowSummaryScreen(bSuccess);
+		}
+
+		public void PausePlay()
+		{
+			_allowUpdate = false;
+			_savedVelocity = _rb.velocity;
+			_rb.velocity = new Vector2(0.0f, 0.0f);
+			_savedGravityScale = _rb.gravityScale;
+			_rb.gravityScale = 0.0f;
+		}
+
+		public void ResumePlay()
+		{
+			_allowUpdate = true;
+			_rb.velocity = _savedVelocity;
+			_savedVelocity = new Vector2(0.0f, 0.0f);
+			_rb.gravityScale = _savedGravityScale;
+			_savedGravityScale = 0.0f;
 		}
 
 		private void GatherInput()
@@ -68,6 +124,16 @@ namespace TarodevController
 
 		private void FixedUpdate()
 		{
+			_time += Time.deltaTime;
+
+			if (!_allowUpdate) return;
+
+			if (_playerMoved)
+			{
+				_points += Time.deltaTime;
+				_timerText?.SetText(((int)(_points * 100.0f)).ToString());
+			}
+
 			CheckCollisions();
 
 			HandleJump();
@@ -86,23 +152,21 @@ namespace TarodevController
 		{
 			Physics2D.queriesStartInColliders = false;
 
-			// Ground and Ceiling
 			bool groundHit = Physics2D.CapsuleCast(_col.bounds.center, _col.size, _col.direction, 0, Vector2.down, _stats.GrounderDistance, ~_stats.PlayerLayer);
 			bool ceilingHit = Physics2D.CapsuleCast(_col.bounds.center, _col.size, _col.direction, 0, Vector2.up, _stats.GrounderDistance, ~_stats.PlayerLayer);
 
-			// Hit a Ceiling
-			if (ceilingHit) _frameVelocity.y = Mathf.Min(0, _frameVelocity.y);
+			if (ceilingHit)
+			{
+				_frameVelocity.y = Mathf.Min(0, _frameVelocity.y);
+			}
 
-			// Landed on the Ground
 			if (!_grounded && groundHit)
 			{
 				_grounded = true;
-				_coyoteUsable = true;
 				_bufferedJumpUsable = true;
 				_endedJumpEarly = false;
 				GroundedChanged?.Invoke(true, Mathf.Abs(_frameVelocity.y));
 			}
-			// Left the Ground
 			else if (_grounded && !groundHit)
 			{
 				_grounded = false;
@@ -121,11 +185,9 @@ namespace TarodevController
 		private bool _jumpToConsume;
 		private bool _bufferedJumpUsable;
 		private bool _endedJumpEarly;
-		private bool _coyoteUsable;
 		private float _timeJumpWasPressed;
 
 		private bool HasBufferedJump => _bufferedJumpUsable && _time < _timeJumpWasPressed + _stats.JumpBuffer;
-		private bool CanUseCoyote => _coyoteUsable && !_grounded && _time < _frameLeftGrounded + _stats.CoyoteTime;
 
 		private void HandleJump()
 		{
@@ -133,7 +195,7 @@ namespace TarodevController
 
 			if (!_jumpToConsume && !HasBufferedJump) return;
 
-			if (_grounded || CanUseCoyote) ExecuteJump();
+			if (_grounded && _playerMoved) ExecuteJump();
 
 			_jumpToConsume = false;
 		}
@@ -143,7 +205,6 @@ namespace TarodevController
 			_endedJumpEarly = false;
 			_timeJumpWasPressed = 0;
 			_bufferedJumpUsable = false;
-			_coyoteUsable = false;
 			_frameVelocity.y = _stats.JumpPower;
 			Jumped?.Invoke();
 		}
@@ -187,26 +248,32 @@ namespace TarodevController
 
 		private void ApplyMovement() => _rb.velocity = _frameVelocity;
 
+		public void GotToEnd()
+		{
+			int levelIndex = SceneManager.GetActiveScene().buildIndex - 1;
+			GetComponent<ScoreDatabase>()?.SaveScore(levelIndex, (int)(_points * 100.0f));
+
+			_points = 0;
+			_playerMoved = false;
+			PlayerReset(true);
+		}
+
+		public void Died()
+		{
+			int levelIndex = SceneManager.GetActiveScene().buildIndex - 1;
+			GetComponent<ScoreDatabase>()?.SaveScore(levelIndex, 0);
+
+			_points = 0;
+			_playerMoved = false;
+			
+			PlayerReset(false);
+		}
+
 #if UNITY_EDITOR
 		private void OnValidate()
 		{
 			if (_stats == null) Debug.LogWarning("Please assign a ScriptableStats asset to the Player Controller's Stats slot", this);
 		}
 #endif
-	}
-
-	public struct FrameInput
-	{
-		public bool JumpDown;
-		public bool JumpHeld;
-		public Vector2 Move;
-	}
-
-	public interface IPlayerController
-	{
-		public event Action<bool, float> GroundedChanged;
-
-		public event Action Jumped;
-		public Vector2 FrameInput { get; }
 	}
 }

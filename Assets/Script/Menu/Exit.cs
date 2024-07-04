@@ -2,12 +2,12 @@ using UnityEngine;
 
 public class Exit : MonoBehaviour
 {
-    public void ExitApplication()
-    {
+	public void ExitApplication()
+	{
 #if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
+		UnityEditor.EditorApplication.isPlaying = false;
 #else
-            Application.Quit();
+		Application.Quit();
 #endif //UNITY_EDITOR
-    }
+	}
 }

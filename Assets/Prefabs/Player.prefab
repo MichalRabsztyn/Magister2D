@@ -2192,16 +2192,13 @@ GameObject:
   - component: {fileID: 305203556302613841}
   - component: {fileID: 1805508883520723217}
   - component: {fileID: 2550338153405357114}
-  - component: {fileID: 2080365737424431597}
-  - component: {fileID: 1535384022661177366}
-  - component: {fileID: 1727363353501753065}
-  - component: {fileID: 3794642915817116888}
   - component: {fileID: 7214945015536780091}
   - component: {fileID: 6650655100682729657}
   - component: {fileID: 7631979544070400871}
   - component: {fileID: 4785765437113509331}
+  - component: {fileID: 852716094439753234}
   m_Layer: 6
-  m_Name: Agent
+  m_Name: Player
   m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2341,99 +2338,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 4
---- !u!114 &2080365737424431597
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7938555342284593915}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5d1c4e0b1822b495aa52bc52839ecb30, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_BrainParameters:
-    VectorObservationSize: 7
-    NumStackedVectorObservations: 1
-    m_ActionSpec:
-      m_NumContinuousActions: 0
-      BranchSizes: 030000000300000002000000
-    VectorActionSize: 030000000300000002000000
-    VectorActionDescriptions: []
-    VectorActionSpaceType: 0
-    hasUpgradedBrainParametersWithActionSpec: 1
-  m_Model: {fileID: 0}
-  m_InferenceDevice: 0
-  m_BehaviorType: 0
-  m_BehaviorName: My Behavior
-  TeamId: 0
-  m_UseChildSensors: 1
-  m_UseChildActuators: 1
-  m_ObservableAttributeHandling: 0
---- !u!114 &1535384022661177366
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7938555342284593915}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3237705d4e6558142a6afabe84271d1e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  agentParameters:
-    maxStep: 0
-  hasUpgradedFromAgentParameters: 1
-  MaxStep: 5000
-  _stats: {fileID: 11400000, guid: 198a1330cfb0bf747937d3dc6c4e1f06, type: 2}
-  _goalGameObject: {fileID: 0}
-  _isBot: 1
-  _level: 1
-  _timerText: {fileID: 737984765253615257}
---- !u!114 &1727363353501753065
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7938555342284593915}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3a5c9d521e5ef4759a8246a07d52221e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  DecisionPeriod: 5
-  TakeActionsBetweenDecisions: 1
---- !u!114 &3794642915817116888
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7938555342284593915}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f67c7e722ba14acd9153bb4488bff6e4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_SensorName: RayPerceptionSensor
-  m_DetectableTags:
-  - Goal
-  - Ground
-  - Gap
-  - Wall
-  m_RaysPerDirection: 8
-  m_MaxRayDegrees: 120
-  m_SphereCastRadius: 0.5
-  m_RayLength: 50
-  m_RayLayerMask:
-    serializedVersion: 2
-    m_Bits: 4294967227
-  m_ObservationStacks: 1
-  rayHitColor: {r: 1, g: 0, b: 0, a: 1}
-  rayMissColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &7214945015536780091
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2486,6 +2390,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d6a521c091e463e44b636b7d93546052, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &852716094439753234
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7938555342284593915}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4c16af0ba685a4c4991be24d2d28cc9a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _stats: {fileID: 11400000, guid: 198a1330cfb0bf747937d3dc6c4e1f06, type: 2}
+  _timerText: {fileID: 737984765253615257}
 --- !u!1 &7979469805198398910
 GameObject:
   m_ObjectHideFlags: 0

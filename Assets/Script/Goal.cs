@@ -5,12 +5,9 @@ using UnityEngine;
 
 public class Goal : MonoBehaviour
 {
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        MLAgentPlayerController sideScrollerAgent = other.GetComponent<MLAgentPlayerController>();
-        if (sideScrollerAgent != null)
-        {
-            sideScrollerAgent.GotToEnd();
-        }
-    }
+	private void OnTriggerEnter2D(Collider2D other)
+	{
+		other.GetComponent<MLAgentPlayerController>()?.Died();
+		other.GetComponent<PlayerController>()?.Died();
+	}
 }

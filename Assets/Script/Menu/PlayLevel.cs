@@ -5,8 +5,8 @@ using UnityEngine.SceneManagement;
 
 public class PlayLevel : MonoBehaviour
 {
-    public void OpenLevel(string levelName)
-    {
-        SceneManager.LoadScene(levelName);
-    }    
+	public void OpenLevel(int levelID)
+	{
+		SceneManager.LoadScene(levelID);
+	}
 }

@@ -10,6 +10,7 @@ public class Spikes : MonoBehaviour
 		if (other.CompareTag("Player"))
 		{
 			other.GetComponent<MLAgentPlayerController>()?.Died();
+			other.GetComponent<PlayerController>()?.Died();
 		}
 	}
 }

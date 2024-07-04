@@ -3,6 +3,8 @@ using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using UnityEngine;
+using TMPro;
+using Unity.MLAgents.Integrations.Match3;
 
 namespace TarodevController
 {
@@ -12,6 +14,7 @@ namespace TarodevController
 		[SerializeField] private GameObject _goalGameObject;
 		[SerializeField] private bool _isBot = true;
 		[SerializeField] private int _level = 1;
+		[SerializeField] private TextMeshProUGUI _timerText;
 		private Rigidbody2D _rb;
 		private CapsuleCollider2D _col;
 		private PausePanel _pausePanel;
@@ -22,9 +25,13 @@ namespace TarodevController
 		private ActionSegment<int> _lastDiscreteAction;
 		private bool _wasJumping = false;
 		private bool _allowUpdate = true;
+		private bool _playerMoved = false;
 
 		private Academy _academy;
 		private Vector3 _startPosition;
+
+		private Vector2 _savedVelocity;
+		private float _savedGravityScale;
 
 		#region Interface
 
@@ -44,12 +51,21 @@ namespace TarodevController
 
 			_cachedQueryStartInColliders = Physics2D.queriesStartInColliders;
 			_startPosition = transform.localPosition;
+			_timerText?.SetText("0");
 		}
 
 		private void Start()
 		{
 			_academy = GameObject.FindObjectOfType<Academy>();
 			_bufferedJumpUsable = false;
+
+			_frameInput = new FrameInput
+			{
+				JumpDown = false,
+				JumpHeld = false,
+				Move = new Vector2(0.0f, 0.0f)
+			};
+			_lastDiscreteAction = new ActionSegment<int>();
 		}
 
 		private void Update()
@@ -67,7 +83,7 @@ namespace TarodevController
 			_grounded = true;
 		}
 
-		private void PlayerReset()
+		private void PlayerReset(bool bSuccess)
 		{
 			_rb.velocity = Vector2.zero;
 			transform.localPosition = _startPosition;
@@ -76,21 +92,32 @@ namespace TarodevController
 			_frameVelocity = Vector2.zero;
 			_bufferedJumpUsable = false;
 
-			GetComponent<PausePanel>()?.ShowPanel();
+			_timerText.SetText("0");
+			GetComponent<SummaryScreen>()?.ShowSummaryScreen(bSuccess);
 		}
 
 		public void PausePlay()
 		{
 			_allowUpdate = false;
+			_savedVelocity = _rb.velocity;
+			_rb.velocity = new Vector2(0.0f, 0.0f);
+			_savedGravityScale = _rb.gravityScale;
+			_rb.gravityScale = 0.0f;
 		}
 
 		public void ResumePlay()
 		{
 			_allowUpdate = true;
+			_rb.velocity = _savedVelocity;
+			_savedVelocity = new Vector2(0.0f, 0.0f);
+			_rb.gravityScale = _savedGravityScale;
+			_savedGravityScale = 0.0f;
 		}
 
 		public override void CollectObservations(VectorSensor sensor)
 		{
+			if (!_isBot) return;
+
 			sensor?.AddObservation(transform.localPosition);
 			sensor?.AddObservation(_rb.velocity);
 			sensor?.AddObservation(_grounded);
@@ -109,14 +136,31 @@ namespace TarodevController
 		{
 			if (_lastDiscreteAction.Length > 1)
 			{
-				_frameInput = new FrameInput
+				if (!_playerMoved && _lastDiscreteAction[0] == 0 && _lastDiscreteAction[1] == 0)
 				{
-					JumpDown = !_wasJumping && _lastDiscreteAction[2] != 0,
-					JumpHeld = _wasJumping && _lastDiscreteAction[2] != 0,
-					Move = new Vector2(_lastDiscreteAction[0] - 1, _lastDiscreteAction[1] - 1)
-				};
+					_frameInput = new FrameInput
+					{
+						JumpDown = false,
+						JumpHeld = false,
+						Move = new Vector2(0.0f, 0.0f)
+					};
+				}
+				else
+				{
+					_frameInput = new FrameInput
+					{
+						JumpDown = !_wasJumping && _lastDiscreteAction[2] != 0,
+						JumpHeld = _wasJumping && _lastDiscreteAction[2] != 0,
+						Move = new Vector2(_lastDiscreteAction[0] - 1, _lastDiscreteAction[1] - 1)
+					};
+				}
 
 				_wasJumping = _lastDiscreteAction.Length > 1 ? _lastDiscreteAction[2] != 0 : false;
+
+				if (_frameInput.Move != Vector2.zero)
+				{
+					_playerMoved = true;
+				}
 			}
 			else
 			{
@@ -147,7 +191,11 @@ namespace TarodevController
 		{
 			if (!_allowUpdate) return;
 
-			_time += Time.deltaTime;
+			if (_playerMoved)
+			{
+				_time += Time.deltaTime;
+				_timerText?.SetText(((int)(_time * 100.0f)).ToString());
+			}
 
 			GatherInput();
 			CheckCollisions();
@@ -285,24 +333,27 @@ namespace TarodevController
 		}
 		public void GotToEnd()
 		{
-			_time = 0;
-
 			if (_isBot)
 			{
 				_academy?.UpdateSuccess();
 				AddReward(5.0f);
+				_time = 0;
+				_playerMoved = false;
 				EndEpisode();
 			}
 			else
 			{
-				GetComponent<ScoreDatabase>()?.SaveScore(_level, (int)_time);
-				PlayerReset();
+				GetComponent<ScoreDatabase>()?.SaveScore(_level, (int)(_time*100.0f));
+				_time = 0;
+				_playerMoved = false;
+				PlayerReset(true);
 			}
 		}
 
 		public void Died()
 		{
 			_time = 0;
+			_playerMoved = false;
 
 			if (_isBot)
 			{
@@ -312,8 +363,8 @@ namespace TarodevController
 			}
 			else
 			{
-				GetComponent<ScoreDatabase>()?.SaveScore(_level, (int)_time);
-				PlayerReset();
+				GetComponent<ScoreDatabase>()?.SaveScore(_level, (int)(_time * 100.0f));
+				PlayerReset(false);
 			}
 		}
 
@@ -323,5 +374,9 @@ namespace TarodevController
 			if (_stats == null) Debug.LogWarning("Please assign a ScriptableStats asset to the Player Controller's Stats slot", this);
 		}
 #endif
+		public int GetLevel()
+		{
+			return _level;
+		}
 	}
 }
