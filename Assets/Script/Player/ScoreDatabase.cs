@@ -39,7 +39,7 @@ public class ScoreDatabase : MonoBehaviour
 
 					if (existingLevelIndex == levelIndex)
 					{
-						if (score > 0 && score < existingScore)
+						if (score > 0 && (score < existingScore || existingScore <= 0))
 						{
 							writer.WriteLine(existingLevelIndex + "," + (existingAttempts + 1) + "," + score);
 						}

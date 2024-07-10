@@ -1,8 +1,4 @@
-using System.Collections;
-using System.Collections.Generic;
-using TarodevController;
 using UnityEngine;
-using UnityEngine.UIElements;
 using TMPro;
 using UnityEngine.SceneManagement;
 
@@ -18,7 +14,6 @@ public class SummaryScreen : MonoBehaviour
 	public void ShowSummaryScreen(bool bSuccess)
 	{
 		_summaryScreen.enabled = true;
-		GetComponent<MLAgentPlayerController>()?.PausePlay();
 		GetComponent<PlayerController>()?.PausePlay();
 		_summaryTitleText.text = bSuccess ? "Wygrana!" : "Spróbuj ponownie!";
 	}
@@ -26,7 +21,6 @@ public class SummaryScreen : MonoBehaviour
 	public void OnTryAgainButtonClick()
 	{
 		_summaryScreen.enabled = false;
-		GetComponent<MLAgentPlayerController>()?.ResumePlay();
 		GetComponent<PlayerController>()?.ResumePlay();
 	}
 

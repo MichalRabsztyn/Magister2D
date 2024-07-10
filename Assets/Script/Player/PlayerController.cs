@@ -1,110 +1,131 @@
 using System;
-using Unity.MLAgents;
-using Unity.MLAgents.Actuators;
-using Unity.MLAgents.Sensors;
 using UnityEngine;
+using TMPro;
+using UnityEngine.SceneManagement;
 
-public class MLAgentPlayerController : Agent, IPlayerController
+public struct FrameInput
+{
+	public bool JumpDown;
+	public bool JumpHeld;
+	public Vector2 Move;
+}
+
+public interface IPlayerController
+{
+	public event Action<bool, float> GroundedChanged;
+
+	public event Action Jumped;
+	public Vector2 FrameInput { get; }
+
+	public void Died();
+	public void GotToEnd();
+}
+
+public class PlayerController : MonoBehaviour, IPlayerController
 {
 	[SerializeField] private ScriptableStats _stats;
-	
-	private GameObject _goalGameObject;
+	[SerializeField] private TextMeshProUGUI _timerText;
+	[SerializeField] private TextMeshProUGUI _levelNameText;
+
 	private Rigidbody2D _rb;
 	private CapsuleCollider2D _col;
+	private UIManager _uiManager;
 	private FrameInput _frameInput;
 	private Vector2 _frameVelocity;
 	private bool _cachedQueryStartInColliders;
 
-	private ActionSegment<int> _lastDiscreteAction;
-	private bool _wasJumping = false;
+	private bool _allowUpdate = true;
+	private bool _playerMoved = false;
 
-	private Academy _academy;
 	private Vector3 _startPosition;
 
+	private Vector2 _savedVelocity;
+	private float _savedGravityScale;
+
 	#region Interface
+
 		public Vector2 FrameInput => _frameInput.Move;
 		public event Action<bool, float> GroundedChanged;
 		public event Action Jumped;
-	#endregion
+
+		#endregion
 
 	private float _time;
+	private float _points;
+
+	private int _levelIndex;
 
 	private void Awake()
 	{
 		_rb = GetComponent<Rigidbody2D>();
 		_col = GetComponent<CapsuleCollider2D>();
+		_uiManager = GetComponent<UIManager>();
 
 		_cachedQueryStartInColliders = Physics2D.queriesStartInColliders;
 		_startPosition = transform.localPosition;
+		_timerText.SetText("00:00:00");
 	}
 
 	private void Start()
 	{
-		_academy = GameObject.FindObjectOfType<Academy>();
-		_goalGameObject = GameObject.FindObjectOfType<GameObject>();
+		_rb.velocity = Vector2.zero;
+		transform.localPosition = _startPosition;
+		_grounded = true;
 
-		_lastDiscreteAction = new ActionSegment<int>();
+		_levelIndex = SceneManager.GetActiveScene().buildIndex - 1;
+		_levelNameText.SetText("Poziom " + _levelIndex);
 	}
 
-	public override void OnEpisodeBegin()
+	private void Update()
+	{
+		if (Input.GetKeyDown(KeyCode.Escape))
+		{
+			_uiManager?.PauseGame();
+			return;
+		}
+
+		GatherInput();
+	}
+
+	private void PlayerReset(bool bSuccess)
 	{
 		_rb.velocity = Vector2.zero;
 		transform.localPosition = _startPosition;
 		_grounded = true;
+		_frameVelocity = Vector2.zero;
+		_bufferedJumpUsable = false;
+		_points = 0;
+		_playerMoved = false;
+
+		_timerText.SetText("00:00:00");
 	}
 
-	public override void CollectObservations(VectorSensor sensor)
+	public void PausePlay()
 	{
-		sensor?.AddObservation(transform.localPosition);
-		sensor?.AddObservation(_rb.velocity);
-		sensor?.AddObservation(_grounded);
-		sensor?.AddObservation(Vector3.Distance(_goalGameObject.transform.position, transform.position));
+		_allowUpdate = false;
+		_savedVelocity = _rb.velocity;
+		_rb.velocity = new Vector2(0.0f, 0.0f);
+		_savedGravityScale = _rb.gravityScale;
+		_rb.gravityScale = 0.0f;
 	}
 
-	public override void OnActionReceived(ActionBuffers actions)
+	public void ResumePlay()
 	{
-		_lastDiscreteAction = actions.DiscreteActions;
-
-		AddReward(-1f / MaxStep);
-		AddReward(Vector3.Distance(_goalGameObject.transform.position, transform.position) / MaxStep);
+		_allowUpdate = true;
+		_rb.velocity = _savedVelocity;
+		_savedVelocity = new Vector2(0.0f, 0.0f);
+		_rb.gravityScale = _savedGravityScale;
+		_savedGravityScale = 0.0f;
 	}
 
 	private void GatherInput()
 	{
-		if (_lastDiscreteAction.Length > 1)
+		_frameInput = new FrameInput
 		{
-			if (_lastDiscreteAction[0] == 0 && _lastDiscreteAction[1] == 0)
-			{
-				_frameInput = new FrameInput
-				{
-					JumpDown = false,
-					JumpHeld = false,
-					Move = new Vector2(0.0f, 0.0f)
-				};
-			}
-			else
-			{
-				_frameInput = new FrameInput
-				{
-					JumpDown = !_wasJumping && _lastDiscreteAction[2] != 0,
-					JumpHeld = _wasJumping && _lastDiscreteAction[2] != 0,
-					Move = new Vector2(_lastDiscreteAction[0] - 1, _lastDiscreteAction[1] - 1)
-				};
-			}
-
-			_wasJumping = _lastDiscreteAction.Length > 1 ? _lastDiscreteAction[2] != 0 : false;
-		}
-		else
-		{
-			_frameInput = new FrameInput
-			{
-				JumpDown = false,
-				JumpHeld = false,
-				Move = new Vector2(0.0f, 0.0f)
-			};
-
-			_wasJumping = false;
-		}
+			JumpDown = Input.GetButtonDown("Jump") || Input.GetKeyDown(KeyCode.C),
+			JumpHeld = Input.GetButton("Jump") || Input.GetKey(KeyCode.C),
+			Move = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"))
+		};
 
 		if (_stats.SnapInput)
 		{
@@ -117,11 +138,27 @@ public class MLAgentPlayerController : Agent, IPlayerController
 			_jumpToConsume = true;
 			_timeJumpWasPressed = _time;
 		}
+
+		if (_frameInput.Move.x != 0 || _frameInput.Move.y != 0) _playerMoved = true;
 	}
 
 	private void FixedUpdate()
 	{
-		GatherInput();
+		_time += Time.deltaTime;
+
+		if (!_allowUpdate) return;
+
+		if (_playerMoved)
+		{
+			_points += Time.deltaTime;
+			System.TimeSpan timeSpan = System.TimeSpan.FromSeconds(_points);
+			string formattedTime = string.Format("{0:D2}:{1:D2}:{2:D2}",
+											 timeSpan.Minutes,
+											 timeSpan.Seconds,
+											 timeSpan.Milliseconds / 10);
+			_timerText?.SetText(formattedTime);
+		}
+
 		CheckCollisions();
 
 		HandleJump();
@@ -129,11 +166,6 @@ public class MLAgentPlayerController : Agent, IPlayerController
 		HandleGravity();
 
 		ApplyMovement();
-
-		if (StepCount == MaxStep)
-		{
-			_academy?.UpdateFail();
-		}
 	}
 
 	#region Collisions
@@ -145,23 +177,21 @@ public class MLAgentPlayerController : Agent, IPlayerController
 		{
 			Physics2D.queriesStartInColliders = false;
 
-			// Ground and Ceiling
 			bool groundHit = Physics2D.CapsuleCast(_col.bounds.center, _col.size, _col.direction, 0, Vector2.down, _stats.GrounderDistance, ~_stats.PlayerLayer);
 			bool ceilingHit = Physics2D.CapsuleCast(_col.bounds.center, _col.size, _col.direction, 0, Vector2.up, _stats.GrounderDistance, ~_stats.PlayerLayer);
 
-			// Hit a Ceiling
-			if (ceilingHit) _frameVelocity.y = Mathf.Min(0, _frameVelocity.y);
+			if (ceilingHit)
+			{
+				_frameVelocity.y = Mathf.Min(0, _frameVelocity.y);
+			}
 
-			// Landed on the Ground
 			if (!_grounded && groundHit)
 			{
 				_grounded = true;
-				_coyoteUsable = true;
 				_bufferedJumpUsable = true;
 				_endedJumpEarly = false;
 				GroundedChanged?.Invoke(true, Mathf.Abs(_frameVelocity.y));
 			}
-			// Left the Ground
 			else if (_grounded && !groundHit)
 			{
 				_grounded = false;
@@ -174,17 +204,14 @@ public class MLAgentPlayerController : Agent, IPlayerController
 
 		#endregion
 
-
 	#region Jumping
 
 		private bool _jumpToConsume;
 		private bool _bufferedJumpUsable;
 		private bool _endedJumpEarly;
-		private bool _coyoteUsable;
 		private float _timeJumpWasPressed;
 
 		private bool HasBufferedJump => _bufferedJumpUsable && _time < _timeJumpWasPressed + _stats.JumpBuffer;
-		private bool CanUseCoyote => _coyoteUsable && !_grounded && _time < _frameLeftGrounded + _stats.CoyoteTime;
 
 		private void HandleJump()
 		{
@@ -192,7 +219,7 @@ public class MLAgentPlayerController : Agent, IPlayerController
 
 			if (!_jumpToConsume && !HasBufferedJump) return;
 
-			if (_grounded || CanUseCoyote) ExecuteJump();
+			if (_grounded && _playerMoved) ExecuteJump();
 
 			_jumpToConsume = false;
 		}
@@ -202,7 +229,6 @@ public class MLAgentPlayerController : Agent, IPlayerController
 			_endedJumpEarly = false;
 			_timeJumpWasPressed = 0;
 			_bufferedJumpUsable = false;
-			_coyoteUsable = false;
 			_frameVelocity.y = _stats.JumpPower;
 			Jumped?.Invoke();
 		}
@@ -246,30 +272,18 @@ public class MLAgentPlayerController : Agent, IPlayerController
 
 	private void ApplyMovement() => _rb.velocity = _frameVelocity;
 
-	public override void Heuristic(in ActionBuffers actionsOut)
-	{
-		var discreteActionsOut = actionsOut.DiscreteActions;
-		discreteActionsOut[0] = Input.GetAxisRaw("Horizontal") < 0 ? 0 : (Input.GetAxisRaw("Horizontal") > 0 ? 2 : 1);
-		discreteActionsOut[1] = Input.GetAxisRaw("Vertical") < 0 ? 0 : (Input.GetAxisRaw("Vertical") > 0 ? 2 : 1);
-		discreteActionsOut[2] = Input.GetKey(KeyCode.Space) ? 1 : 0;
-	}
 	public void GotToEnd()
 	{
-		_academy?.UpdateSuccess();
+		GetComponent<ScoreDatabase>()?.SaveScore(_levelIndex, (int)(_points * 100.0f));
 
-		AddReward(5.0f);
-		_time = 0;
-
-		EndEpisode();	
+		_uiManager.ShowSummary(true);
 	}
 
 	public void Died()
 	{
-		_time = 0;
+		GetComponent<ScoreDatabase>()?.SaveScore(_levelIndex, 0);
 
-		_academy?.UpdateFail();
-		AddReward(-1.0f);
-		EndEpisode();
+		_uiManager.ShowSummary(false);
 	}
 
 #if UNITY_EDITOR
